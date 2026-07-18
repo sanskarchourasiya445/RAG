@@ -1,0 +1,69 @@
+# =========================
+# LangChain Core
+# =========================
+langchain
+langchain-core
+langchain-community
+langchain-text-splitters
+
+# =========================
+# LangGraph
+# =========================
+langgraph
+
+# =========================
+# LLM Providers
+# =========================
+langchain-openai
+langchain-google-genai>=2.0.0
+langchain-mistralai
+openai
+mistralai
+
+# =========================
+# Vector Database
+# =========================
+langchain-chroma
+chromadb
+
+# =========================
+# Embeddings
+# =========================
+langchain-huggingface
+sentence-transformers
+
+# =========================
+# Document Loaders
+# =========================
+pypdf
+beautifulsoup4
+lxml
+unstructured
+
+# =========================
+# Token Counting
+# =========================
+tiktoken
+
+# =========================
+# Environment Variables
+# =========================
+python-dotenv
+
+# =========================
+# Data Handling
+# =========================
+pandas
+numpy
+
+# =========================
+# API Layer
+# =========================
+fastapi
+uvicorn
+
+# =========================
+# Utilities
+# =========================
+requests
+tqdm
