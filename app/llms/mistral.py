@@ -16,8 +16,7 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from mistralai import Mistral
-
+from mistralai.client import Mistral
 from app.config import MISTRAL_MODEL
 from app.llms.base import BaseLLM, LLMGenerationError
 

@@ -1,0 +1,37 @@
+Metadata-Version: 2.4
+Name: rag
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: langchain
+Requires-Dist: langchain-core
+Requires-Dist: langchain-community
+Requires-Dist: langchain-text-splitters
+Requires-Dist: langgraph
+Requires-Dist: langchain-openai
+Requires-Dist: langchain-google-genai
+Requires-Dist: langchain-mistralai
+Requires-Dist: openai
+Requires-Dist: mistralai
+Requires-Dist: langchain-chroma
+Requires-Dist: chromadb
+Requires-Dist: rank_bm25
+Requires-Dist: langchain-huggingface
+Requires-Dist: sentence-transformers
+Requires-Dist: pypdf
+Requires-Dist: beautifulsoup4
+Requires-Dist: lxml
+Requires-Dist: unstructured
+Requires-Dist: tiktoken
+Requires-Dist: python-dotenv
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: requests
+Requires-Dist: tqdm
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+
+# RAG

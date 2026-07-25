@@ -27,6 +27,11 @@ langchain-chroma
 chromadb
 
 # =========================
+# Sparse / Keyword Retrieval
+# =========================
+rank_bm25
+
+# =========================
 # Embeddings
 # =========================
 langchain-huggingface

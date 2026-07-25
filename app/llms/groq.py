@@ -8,7 +8,7 @@ Mistral's or Google's - their documented integration path is an
 OpenAI-compatible REST API. We use the `openai` package pointed at xAI's
 base_url, which is the officially documented approach.
 
-Loads its own GROK_API_KEY directly from the environment - no central
+Loads its own Groq_API_KEY directly from the environment - no central
 settings object involved.
 """
 
@@ -20,21 +20,21 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.config import GROK_MODEL
+from app.config import GROQ_MODEL
 from app.llms.base import BaseLLM, LLMGenerationError
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-XAI_BASE_URL = "https://api.x.ai/v1"
+XAI_BASE_URL = "https://api.groq.com/openai/v1"
 
 
-class GrokLLM(BaseLLM):
-    provider_name = "grok"
+class GroqLLM(BaseLLM):
+    provider_name = "groq"
 
-    def __init__(self, api_key: str | None = None, model: str = GROK_MODEL) -> None:
-        api_key = api_key or os.getenv("GROK_API_KEY")
+    def __init__(self, api_key: str | None = None, model: str = GROQ_MODEL) -> None:
+        api_key = api_key or os.getenv("GROQ_API_KEY")
         if not api_key:
             raise LLMGenerationError(
                 "GROQ_API_KEY is not set. Add it to your .env file to use "
@@ -51,8 +51,8 @@ class GrokLLM(BaseLLM):
                 temperature=0.2,
             )
         except Exception as exc:  # noqa: BLE001
-            logger.error("Grok generation failed: %s", exc)
-            raise LLMGenerationError(f"Grok generation failed: {exc}") from exc
+            logger.error("Groq generation failed: %s", exc)
+            raise LLMGenerationError(f"Groq generation failed: {exc}") from exc
 
         if not response.choices:
             raise LLMGenerationError("Groq returned no choices in the response.")

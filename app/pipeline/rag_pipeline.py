@@ -31,19 +31,32 @@ from typing import List
 
 from langchain_core.documents import Document
 
+from app.chunkers.parent_child_chunker import split_into_parent_child
 from app.chunkers.recursive_chunker import chunk_documents
-from app.config import NO_ANSWER_MESSAGE, DOCUMENTS_DIR, ensure_dirs
+from app.config import (
+    CHILD_CHUNK_OVERLAP,
+    CHILD_CHUNK_SIZE,
+    DOCUMENTS_DIR,
+    NO_ANSWER_MESSAGE,
+    PARENT_CHUNK_OVERLAP,
+    PARENT_CHUNK_SIZE,
+    PARENT_STORE_DIR,
+    RETRIEVER_TYPE,
+    ensure_dirs,
+)
 from app.embeddings.embedding_model import get_embedding_model
 from app.llms.base import BaseLLM, LLMGenerationError
 from app.llms.llm_factory import get_llm
 from app.loaders.pdf_loader import LoadResult, load_all_pdfs
 from app.prompts.rag_prompt import build_rag_prompt
-from app.retrievers.retriever import build_retriever
+from app.retrievers.base import BaseRetriever
+from app.retrievers.factory import RetrieverFactory
 from app.utils.timer import Timer
 from app.vectorstores.chroma_store import (
     VectorStoreError,
     get_or_create_vector_store,
 )
+from app.vectorstores.parent_store import ParentDocumentStore
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +97,7 @@ class RAGPipeline:
 
     def __init__(self) -> None:
         self.llm: BaseLLM
-        self._retriever = None
+        self._retriever: BaseRetriever | None = None
         self.ingestion_report = IngestionReport()
 
     def initialize(self) -> IngestionReport:
@@ -96,6 +109,16 @@ class RAGPipeline:
         ensure_dirs()
 
         embedding_model = get_embedding_model()
+
+        # Only used for retriever_type="parent" - built unconditionally
+        # (cheap: just ensures a directory exists) whenever that strategy
+        # is configured, since it's needed whether we're ingesting fresh
+        # documents below OR loading an already-populated vector store
+        # (the parent chunks living on disk here are what make either
+        # path work).
+        parent_store: ParentDocumentStore | None = None
+        if RETRIEVER_TYPE == "parent":
+            parent_store = ParentDocumentStore(PARENT_STORE_DIR)
 
         # We only actually load/chunk PDFs if no existing vector store is
         # found - vector_store module handles that check. We pass a
@@ -112,6 +135,25 @@ class RAGPipeline:
                     "vector store from zero documents. Add PDFs to the "
                     "documents folder and restart."
                 )
+
+            if RETRIEVER_TYPE == "parent":
+                # The vector store must be populated with CHILD chunks for
+                # this strategy - the PARENT chunks are persisted separately
+                # (parent_store), never embedded/indexed themselves. See
+                # app/retrievers/parent.py for how a child match is mapped
+                # back to its parent at query time.
+                parents, children = split_into_parent_child(
+                    result.documents,
+                    parent_chunk_size=PARENT_CHUNK_SIZE,
+                    parent_chunk_overlap=PARENT_CHUNK_OVERLAP,
+                    child_chunk_size=CHILD_CHUNK_SIZE,
+                    child_chunk_overlap=CHILD_CHUNK_OVERLAP,
+                )
+                assert parent_store is not None  # guaranteed by the RETRIEVER_TYPE check above
+                parent_store.save_all(parents)
+                self.ingestion_report.total_chunks = len(children)
+                return children
+
             chunks = chunk_documents(result.documents)
             self.ingestion_report.total_chunks = len(chunks)
             return chunks
@@ -133,12 +175,19 @@ class RAGPipeline:
         else:
             self.ingestion_report.loaded_from_existing_store = True
 
-        self._retriever = build_retriever(vector_store)
-
+        # LLM is built BEFORE the retriever: some strategies (e.g.
+        # "multi_query") need an already-instantiated BaseLLM to generate
+        # query variants, and the factory takes it as a plain argument
+        # rather than constructing its own - one LLM instance per
+        # pipeline, shared by both generation and retrieval.
         try:
             self.llm = get_llm()
         except LLMGenerationError as exc:
             raise PipelineError(f"LLM initialization failed: {exc}") from exc
+
+        self._retriever = RetrieverFactory.create(
+            vector_store, llm=self.llm, parent_store=parent_store
+        )
 
         logger.info("RAG pipeline initialized successfully.")
         return self.ingestion_report
@@ -150,7 +199,7 @@ class RAGPipeline:
 
         with Timer() as total_timer:
             logger.info("Retrieving context for question: %r", question)
-            documents = self._retriever.invoke(question)
+            documents = self._retriever.retrieve(question)
 
             # Layer 1 guard: zero retrieved chunks -> short-circuit, no LLM call.
             if not documents:

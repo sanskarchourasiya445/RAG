@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 SUPPORTED_PROVIDERS = ("mistral", "gemini", "groq")
 
 
+import app.config
+
 def get_llm(provider: str | None = None) -> BaseLLM:
     """Instantiate the configured LLM provider.
 
@@ -32,7 +34,11 @@ def get_llm(provider: str | None = None) -> BaseLLM:
         provider: override the configured provider (mainly useful for
         tests). Defaults to app.config.LLM_PROVIDER.
     """
+    print(f"[DEBUG] app.config.__file__: {app.config.__file__}")
+    print(f"[DEBUG] LLM_PROVIDER value: {LLM_PROVIDER}")
+    print(f"[DEBUG] llm_factory.__file__: {__file__}")
     selected = (provider or LLM_PROVIDER).lower()
+    print(f"[DEBUG] selected value inside get_llm(): {selected}")
     logger.info("Initializing LLM provider: %s", selected)
 
     if selected == "mistral":
@@ -46,9 +52,9 @@ def get_llm(provider: str | None = None) -> BaseLLM:
         return GeminiLLM()
 
     if selected == "groq":
-        from app.llms.groq import GrokLLM
+        from app.llms.groq import GroqLLM
 
-        return GrokLLM()
+        return GroqLLM()
 
     raise LLMGenerationError(
         f"Unsupported LLM provider: '{selected}'. Must be one of {SUPPORTED_PROVIDERS} "

@@ -20,14 +20,12 @@ from app.config import NO_ANSWER_MESSAGE
 from app.llms.base import LLMGenerationError
 from app.pipeline.rag_pipeline import PipelineError, RAGPipeline
 
-
 class _FakeRetriever:
     def __init__(self, documents):
         self._documents = documents
 
-    def invoke(self, question: str):
+    def retrieve(self, question):
         return self._documents
-
 
 class _FakeLLM:
     def __init__(self, response: str = "Fake grounded answer.", should_fail: bool = False):

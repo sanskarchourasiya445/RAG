@@ -17,10 +17,20 @@ import logging
 import sys
 
 from app.config import (
+    CHILD_CHUNK_SIZE,
+    CROSS_ENCODER_MODEL,
     EMBEDDING_MODEL,
+    ENABLE_COMPRESSION,
+    ENABLE_RERANKER,
     FETCH_K,
+    FINAL_K,
+    HYBRID_BM25_WEIGHT,
+    HYBRID_VECTOR_WEIGHT,
     LAMBDA_MULT,
     LLM_PROVIDER,
+    MULTI_QUERY_COUNT,
+    PARENT_CHUNK_SIZE,
+    RERANK_CANDIDATE_K,
     RETRIEVER_TYPE,
     TOP_K,
 )
@@ -29,6 +39,26 @@ from app.utils.helpers import format_sources_for_console, pluralize
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def _describe_retriever_strategy() -> str:
+    """One line of the settings specific to the configured RETRIEVER_TYPE.
+    Pure formatting of existing config values - no retriever-building
+    logic lives here (that's RetrieverFactory's job)."""
+    if RETRIEVER_TYPE == "multi_query":
+        return f"top_k={TOP_K}, fetch_k={FETCH_K}, lambda={LAMBDA_MULT}, query_count={MULTI_QUERY_COUNT}"
+    if RETRIEVER_TYPE == "bm25":
+        return f"top_k={TOP_K}"
+    if RETRIEVER_TYPE == "hybrid":
+        return (
+            f"top_k={TOP_K}, fetch_k={FETCH_K}, lambda={LAMBDA_MULT}, "
+            f"vector_weight={HYBRID_VECTOR_WEIGHT}, bm25_weight={HYBRID_BM25_WEIGHT}"
+        )
+    if RETRIEVER_TYPE == "parent":
+        return f"parent_chunk_size={PARENT_CHUNK_SIZE}, child_chunk_size={CHILD_CHUNK_SIZE}"
+    # "vector" (the default) and any unrecognized value fall back to the
+    # base MMR settings every strategy is built on top of.
+    return f"top_k={TOP_K}, fetch_k={FETCH_K}, lambda={LAMBDA_MULT}"
 
 
 def print_startup_report(report: IngestionReport) -> None:
@@ -52,8 +82,18 @@ def print_startup_report(report: IngestionReport) -> None:
         print("Vector database status  : created and persisted")
 
     print(f"Embedding model          : {EMBEDDING_MODEL}")
-    print(f"Retriever                : {RETRIEVER_TYPE} "
-          f"(top_k={TOP_K}, fetch_k={FETCH_K}, lambda={LAMBDA_MULT})")
+    print(f"Retriever strategy       : {RETRIEVER_TYPE} ({_describe_retriever_strategy()})")
+
+    if ENABLE_RERANKER:
+        print(
+            f"Reranking                : enabled "
+            f"(model={CROSS_ENCODER_MODEL}, candidates={RERANK_CANDIDATE_K}, final_k={FINAL_K})"
+        )
+    else:
+        print("Reranking                : disabled")
+
+    print(f"Contextual compression   : {'enabled' if ENABLE_COMPRESSION else 'disabled'}")
+
     print(f"Selected LLM provider    : {LLM_PROVIDER}")
     print("Retriever initialized    : yes")
     print("=" * 60)

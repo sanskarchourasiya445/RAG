@@ -98,6 +98,32 @@ def load_vector_store(embedding_model: Embeddings) -> Chroma:
         raise VectorStoreError(f"Failed to load vector store: {exc}") from exc
 
 
+def get_all_documents(store: Chroma) -> List[Document]:
+    """Fetch every chunk currently stored in the collection, reconstructed
+    as LangChain Documents.
+
+    Why this exists: sparse/keyword retrieval (BM25, app/retrievers/bm25.py)
+    needs the full corpus text up front to build its index - unlike vector
+    search, there's no equivalent of "similarity search a subset of the
+    store". This is the one place that knows HOW to pull that corpus back
+    out of Chroma (via the underlying collection's .get()), so BM25Retriever
+    itself stays vector-store-agnostic.
+    """
+    try:
+        raw = store.get(include=["documents", "metadatas"])
+    except Exception as exc:  # noqa: BLE001
+        raise VectorStoreError(
+            f"Failed to fetch documents from vector store: {exc}"
+        ) from exc
+
+    texts = raw.get("documents") or []
+    metadatas = raw.get("metadatas") or []
+    return [
+        Document(page_content=text, metadata=metadata or {})
+        for text, metadata in zip(texts, metadatas)
+    ]
+
+
 def get_or_create_vector_store(
     embedding_model: Embeddings,
     documents_provider: Optional[callable] = None,
