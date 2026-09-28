@@ -27,13 +27,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 DOCUMENTS_DIR = PROJECT_ROOT / "documents"
-VECTOR_DB_DIR = PROJECT_ROOT / "chroma_db"
+VECTOR_DB_DIR = PROJECT_ROOT / "data" / "chroma"
 
 SUPPORTED_FILE_EXTENSIONS = (".pdf",)
 
 
 def ensure_dirs() -> None:
-    """Create the documents/ and chroma_db/ folders if they don't exist yet.
+    """Create the documents/ and data/chroma/ folders if they don't exist yet.
     Called once at startup so ingestion never fails on a missing folder."""
     DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
     VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,7 +109,7 @@ PARENT_CHUNK_SIZE = 2000
 PARENT_CHUNK_OVERLAP = 200
 CHILD_CHUNK_SIZE = 400
 CHILD_CHUNK_OVERLAP = 50
-PARENT_STORE_DIR = PROJECT_ROOT / "parent_store"
+PARENT_STORE_DIR = PROJECT_ROOT / "data" / "parent_store"
 
 # ---------------------------------------------------------------------
 # LLM provider selection

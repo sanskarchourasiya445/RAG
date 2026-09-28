@@ -7,10 +7,18 @@ provider name to a concrete BaseLLM implementation.
 This is what makes "switch LLM provider by editing one value in
 app/config.py, zero code changes elsewhere" true: main.py / rag_pipeline.py
 call get_llm() and receive a BaseLLM - they never import
-MistralLLM/GeminiLLM/GrokLLM directly.
+MistralLLM/GeminiLLM/GroqLLM directly.
 
 Adding a 4th provider later = one new app/llms/<provider>.py file + one
 new branch here. No other file in the repository changes.
+
+Canonical provider names
+------------------------
+  "mistral"   → MistralLLM
+  "gemini"    → GeminiLLM
+  "groq"      → GroqLLM   (also accepted as "grok" for backwards compatibility)
+
+All names are case-insensitive ("GROQ" == "groq").
 """
 
 from __future__ import annotations
@@ -24,8 +32,14 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_PROVIDERS = ("mistral", "gemini", "groq")
 
+# Backwards-compatibility aliases: old name → canonical name.
+# "grok" was an early typo for the Groq provider that found its way into
+# tests and documentation. Keeping it as a silent alias avoids breaking
+# existing .env files or muscle memory without widening the public API.
+_ALIASES: dict[str, str] = {
+    "grok": "groq",
+}
 
-import app.config
 
 def get_llm(provider: str | None = None) -> BaseLLM:
     """Instantiate the configured LLM provider.
@@ -34,11 +48,8 @@ def get_llm(provider: str | None = None) -> BaseLLM:
         provider: override the configured provider (mainly useful for
         tests). Defaults to app.config.LLM_PROVIDER.
     """
-    print(f"[DEBUG] app.config.__file__: {app.config.__file__}")
-    print(f"[DEBUG] LLM_PROVIDER value: {LLM_PROVIDER}")
-    print(f"[DEBUG] llm_factory.__file__: {__file__}")
-    selected = (provider or LLM_PROVIDER).lower()
-    print(f"[DEBUG] selected value inside get_llm(): {selected}")
+    raw = (provider or LLM_PROVIDER).lower()
+    selected = _ALIASES.get(raw, raw)
     logger.info("Initializing LLM provider: %s", selected)
 
     if selected == "mistral":
@@ -57,6 +68,6 @@ def get_llm(provider: str | None = None) -> BaseLLM:
         return GroqLLM()
 
     raise LLMGenerationError(
-        f"Unsupported LLM provider: '{selected}'. Must be one of {SUPPORTED_PROVIDERS} "
+        f"Unsupported LLM provider: '{raw}'. Must be one of {SUPPORTED_PROVIDERS} "
         f"(set LLM_PROVIDER in app/config.py)."
     )

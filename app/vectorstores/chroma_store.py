@@ -27,6 +27,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
+from app.chunkers.recursive_chunker import make_chunk_id
 from app.config import CHROMA_COLLECTION_NAME, VECTOR_DB_DIR
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,34 @@ def vector_store_exists_with_data(embedding_model: Embeddings) -> bool:
         return False
 
 
+def _build_ids(documents: List[Document]) -> List[str]:
+    """Derive a deterministic Chroma ID for every document in the list.
+
+    Uses make_chunk_id(source, page, chunk_index) when those metadata fields
+    are present. Falls back to a hash of the raw page_content for documents
+    that didn't go through the standard chunker (e.g. parent chunks stored
+    in the parent-document retriever strategy).
+    """
+    ids = []
+    for doc in documents:
+        source = doc.metadata.get("source_filename") or doc.metadata.get("source", "")
+        page = doc.metadata.get("page", 0)
+        chunk_index = doc.metadata.get("chunk_index")
+        if chunk_index is not None:
+            ids.append(make_chunk_id(source, page, chunk_index))
+        else:
+            # Parent chunks / documents without a chunk_index: hash content.
+            import hashlib  # stdlib, always available  # noqa: PLC0415
+            ids.append(hashlib.sha256(doc.page_content.encode()).hexdigest()[:32])
+    return ids
+
+
 def create_vector_store(documents: List[Document], embedding_model: Embeddings) -> Chroma:
     """Create a brand-new persisted Chroma collection from chunked documents."""
     if not documents:
         raise VectorStoreError("Cannot create a vector store from an empty document list.")
 
+    ids = _build_ids(documents)
     try:
         logger.info(
             "Creating new Chroma collection '%s' with %d document(s)...",
@@ -76,6 +100,7 @@ def create_vector_store(documents: List[Document], embedding_model: Embeddings) 
         )
         store = Chroma.from_documents(
             documents=documents,
+            ids=ids,
             embedding=embedding_model,
             collection_name=CHROMA_COLLECTION_NAME,
             persist_directory=str(VECTOR_DB_DIR),

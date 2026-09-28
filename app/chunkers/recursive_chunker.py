@@ -17,6 +17,7 @@ config change, not a change scattered across files.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import List
 
@@ -26,6 +27,37 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.config import CHUNK_OVERLAP, CHUNK_SIZE
 
 logger = logging.getLogger(__name__)
+
+
+def make_chunk_id(source: str, page: int | str, chunk_index: int) -> str:
+    """Return a stable, deterministic ID for a single chunk.
+
+    The ID is a truncated SHA-256 hex digest of the canonical string:
+
+        "<source>:<page>:<chunk_index>"
+
+    Why SHA-256 (not uuid4)?
+    - Deterministic: same inputs always produce the same ID, so re-running
+      ingestion on the same document set produces the same IDs. Chroma's
+      upsert logic can then detect unchanged chunks instead of inserting
+      duplicates.
+    - Collision-resistant: the 16-byte (32-hex-char) prefix of SHA-256 gives
+      ~1 in 10^38 collision probability for any realistic document corpus.
+    - Human-debuggable: you can reproduce the ID from the metadata alone
+      without having to store the ID separately.
+
+    Args:
+        source:      the 'source' metadata field (typically a file path).
+        page:        the 'page' metadata field (0-indexed or whatever the
+                     loader sets).
+        chunk_index: position of this chunk within its source file (assigned
+                     by chunk_documents).
+
+    Returns:
+        A 32-character lowercase hex string.
+    """
+    raw = f"{source}:{page}:{chunk_index}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
 def build_splitter(

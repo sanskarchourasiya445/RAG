@@ -17,12 +17,15 @@ from langchain_core.documents import Document
 def document_key(document: Document) -> tuple:
     """Build a stable identity key for a Document.
 
-    Prefers (source, page) metadata when available - two chunks from the
-    same source/page are almost certainly the same chunk retrieved twice
-    (via different query variants, or by both halves of a hybrid search).
-    Falls back to the raw page_content when that metadata isn't present
-    (e.g. loaders that don't set it), so identity still works, just at
-    exact-text granularity instead.
+    Uses (source, page, chunk_index) when all three metadata fields are
+    available. chunk_index is assigned by the chunker (recursive_chunker.py)
+    to distinguish multiple chunks that come from the same source/page —
+    without it, two chunks from page 3 of the same PDF would collide and one
+    would be silently dropped during RRF deduplication.
+
+    Falls back to (source, page) when chunk_index is absent (e.g. parent
+    chunks, which represent a full page-level split and are not sub-indexed),
+    and then to raw page_content for loaders that don't set source/page at all.
 
     Public (not just an internal helper for deduplicate_documents below)
     because HybridRetriever (app/retrievers/hybrid.py) needs the same
@@ -32,6 +35,9 @@ def document_key(document: Document) -> tuple:
     source = document.metadata.get("source")
     page = document.metadata.get("page")
     if source is not None and page is not None:
+        chunk_index = document.metadata.get("chunk_index")
+        if chunk_index is not None:
+            return (source, page, chunk_index)
         return (source, page)
     return (document.page_content,)
 

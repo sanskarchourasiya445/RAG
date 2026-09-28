@@ -25,8 +25,8 @@ strategy never needs a parent/child branch inside it.
 
 from __future__ import annotations
 
+import hashlib
 import logging
-import uuid
 from typing import List, Tuple
 
 from langchain_core.documents import Document
@@ -93,8 +93,21 @@ def split_into_parent_child(
     parents_with_ids: List[Document] = []
     child_chunks: List[Document] = []
 
+    # Track a per-source parent counter so the ID is stable:
+    # parent N from file X always gets the same hash regardless of
+    # which other files are being ingested in the same batch.
+    per_source_parent_counter: dict[str, int] = {}
+
     for parent in parent_chunks:
-        parent_id = str(uuid.uuid4())
+        source = parent.metadata.get("source_filename") or parent.metadata.get("source", "")
+        page = parent.metadata.get("page", 0)
+        parent_idx = per_source_parent_counter.get(source, 0)
+        per_source_parent_counter[source] = parent_idx + 1
+
+        # Deterministic parent_id: same document ingested twice → same ID.
+        raw = f"{source}:{page}:{parent_idx}"
+        parent_id = hashlib.sha256(raw.encode()).hexdigest()[:32]
+
         parent.metadata["parent_id"] = parent_id
         parents_with_ids.append(parent)
 
